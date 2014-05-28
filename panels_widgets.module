@@ -124,6 +124,24 @@ function panels_widgets_get_types($type = NULL) {
 }
 
 /**
+ * Get an arral of all panels widgets by admin name.
+ *
+ * @param string $name
+ *   The machine-readable name of the panel widget to load.
+ *
+ * @return PanelsWidgets[]
+ *   An array of widgets or a single type.
+ */
+function panels_widgets_get_widget_by_name($name = NULL) {
+  // Collect multiple widget entities by admin_name, checking for a single value
+  // if it is specified.
+  $widgets = entity_load_multiple_by_name('panels_widgets', isset($name) ? array($name) : FALSE);
+  // If $name was requested, ensure a single value is returned otherwise return
+  // the list of widgets.
+  return isset($name) ? reset($widgets) : $widgets;
+}
+
+/**
  * Fetch a Panels Widget Object.
  *
  * @param int $pwid
@@ -204,6 +222,34 @@ function panels_widgets_form_submit_handler(&$form, &$form_state) {
     // Update the entity with the submitted values in the form.
     field_attach_submit('panels_widgets', $widget, $form['widget_' . $type], $form_state);
   }
+}
+
+/**
+ * Overrides the default Panels title handling to allow improved ux.
+ */
+function panels_widgets_default_panels_override(&$form, &$form_state) {
+  // Update the Title field text so it is required and doesn't have a dependency
+  // on the override title checkbox.
+  $form['override_title_text']['#title'] = t('Widget Title');
+  $form['override_title_text']['#dependency'] = FALSE;
+  $form['override_title_text']['#weight'] = -2;
+  $form['override_title_text']['#required'] = TRUE;
+  $form['override_title_markup']['#weight'] = -1;
+
+  // Add an admin_name machine_name field to store with the widgets entity.
+  $form['content_name'] = array(
+    '#type' => 'machine_name',
+    '#default_value' => '',
+    '#machine_name' => array(
+      'exists' => 'panels_widgets_get_widget_by_name',
+      'source' => array('override_title_text'),
+    ),
+    '#description' => t('A unique machine-readable name for this widget content. It must only contain lowercase letters, numbers and underscores.'),
+  );
+
+  // Change the override title text and modify the positioning.
+  $form['override_title']['#title'] = t('Display title in content?');
+  $form['override_title']['#weight'] = 0;
 }
 
 /**
@@ -364,7 +410,7 @@ class PanelsWidgets extends Entity {
   public function save() {
     // Add a created time if it doesn't exist.
     if (empty($this->created) && (!empty($this->is_new) || !$this->pid)) {
-      $this->created = REQUEST_TIME;
+      $this->created = RQUEST_TIME;
     }
     // Update the changed time.
     $this->changed = REQUEST_TIME;

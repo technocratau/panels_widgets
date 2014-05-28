@@ -110,6 +110,10 @@ function panels_widgets_widget_content_content_type_edit_form($form, &$form_stat
     // entity per form but this will make it easier to reference later.
     $form_state['widget'][$widget->type] = $widget;
   }
+
+  // Modify the default panels title handling for the widget content types.
+  panels_widgets_default_panels_override($form, $state);
+
   // Attach the Widget Entity to the Widget Type Entity form.
   panels_widgets_attach_form($form, $form_state);
 
@@ -126,8 +130,25 @@ function panels_widgets_widget_content_content_type_edit_form_submit(&$form, &$f
 
   // Set the panels widget id.
   foreach ($form_state['widget'] as $type => $widget) {
+    // Set the widget label and machine name.
+    $widget->label = $form_state['conf']['override_title_text'];
+    $widget->admin_name = $form_state['values']['content_name'];
+    // Save the label and machine name.
     panels_widgets_save_widget($widget);
     $form_state['conf']['pwid'] = $widget->pwid;
+  }
+}
+
+/**
+ * Admin info for Widget Panel Pane.
+ */
+function panels_widgets_widget_content_content_type_admin_info($subtype, $conf, $contexts) {
+  if (!empty($conf)) {
+
+    $block = new stdClass();
+    $block->title = $conf['override_title_text'];
+
+    return $block;
   }
 }
 
@@ -136,9 +157,12 @@ function panels_widgets_widget_content_content_type_edit_form_submit(&$form, &$f
  */
 function panels_widgets_widget_content_content_type_render($subtype, $conf, $panel_args, $contexts = NULL) {
   // Load the Panels Widget Content;
-  $widget = panels_widgets_load($conf['pwid']);
+  if (!$widget = panels_widgets_load($conf['pwid'])) {
+    return;
+  }
+
   // Hide the Panels Widget Label from display.
-  $widget->label = '';
+  $widget->label = NULL;
   // Instantiate an empty block class.
   $block = new stdClass();
   // Set the title based on the Panels Title selection.

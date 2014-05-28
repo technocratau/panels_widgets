@@ -35,6 +35,13 @@ function panels_widgets_schema() {
         'default' => NULL,
         'description' => "The {panels_pane}.pid of the associated widget type.",
       ),
+      'admin_name' => array(
+        'description' => 'The machine-readable name of this widget.',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => FALSE,
+        'default' => NULL,
+      ),
       'label' => array(
         'description' => 'A human readable label for this widget.',
         'type' => 'varchar',
@@ -55,6 +62,7 @@ function panels_widgets_schema() {
     ),
     'indexes' => array(
       'pid' => array('pid'),
+      'admin_name' => array('admin_name'),
     ),
     'foreign keys' => array(
       'pid' => array(
