@@ -1,0 +1,10 @@
+name = "Panels Widgets"
+description = "Content Widgets made available to Panels"
+package = Panels
+core = "7.x"
+dependencies[] = "panels"
+dependencies[] = "panels_mini"
+dependencies[] = "context"
+dependencies[] = "ctools"
+files[] = panels_widgets.admin.inc
+configure = admin/structure/widgets

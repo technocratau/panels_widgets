@@ -1,0 +1,409 @@
+<?php
+
+/**
+ * @file
+ * Panels Widgets module provides editable content types for Panels.
+ */
+
+
+/**
+ * Implements hook_entity_info().
+ */
+function panels_widgets_entity_info() {
+  // Build the entity info for the panels_widgets entities.
+  $return = array(
+    'panels_widgets' => array(
+      'label' => t('Panels Widget'),
+      'plural label' => t('Panels Widgets'),
+      'description' => t('Panels Content Widgets.'),
+      'entity class' => 'PanelsWidgets',
+      'controller class' => 'EntityAPIController',
+      'base table' => 'panels_widgets',
+      'fieldable' => TRUE,
+      'entity keys' => array(
+        'id' => 'pwid',
+        'bundle' => 'type',
+        'label' => 'label',
+      ),
+      'bundles' => array(),
+      'bundle keys' => array(
+        'bundle' => 'type',
+      ),
+      'label callback' => 'entity_class_label',
+      'uri callback' => 'panels_widgets_uri',
+      'module' => 'panels_widgets',
+    ),
+  );
+  // Fetch all available widget types to store administrative handling.
+  $types = db_select('panels_widgets_type', 'p')
+    ->fields('p')
+    ->execute()
+    ->fetchAllAssoc('type');
+  // For each bundle type.
+  foreach ($types as $type => $info) {
+    // Register administrative label, path and access handling.
+    $return['panels_widgets']['bundles'][$type] = array(
+      'label' => $info->label,
+      'admin' => array(
+        'path' => 'admin/structure/widgets/manage/%panels_widgets_type',
+        'real path' => 'admin/structure/widgets/manage/' . $type,
+        'bundle argument' => 4,
+        'access arguments' => array('administer panels widget types'),
+      ),
+    );
+  }
+  // Build the entity info for the panels_widgets_type entities.
+  $return['panels_widgets_type'] = array(
+    'label' => t('Panels Widget Type'),
+    'plural label' => t('Panels Widget Types'),
+    'description' => t('Panels Content Widget Types.'),
+    'entity class' => 'PanelsWidgetsType',
+    'controller class' => 'EntityAPIControllerExportable',
+    'base table' => 'panels_widgets_type',
+    'fieldable' => FALSE,
+    'bundle of' => 'panels_widgets',
+    'exportable' => TRUE,
+    'entity keys' => array(
+      'id' => 'id',
+      'name' => 'type',
+      'label' => 'label',
+    ),
+    'access callback' => 'panels_widgets_type_access',
+    'module' => 'panels_widgets',
+    'admin ui' => array(
+      'path' => 'admin/structure/widgets',
+      'file' => 'panels_widgets.admin.inc',
+      'controller class' => 'PanelsWidgetsTypeUIController',
+    ),
+  );
+
+  return $return;
+}
+
+/**
+ * Implements hook_permission().
+ */
+function panels_widgets_permission() {
+  $permissions = array(
+    'administer panels widget types' => array(
+      'title' => t('Administer widget types'),
+      'description' => t('Create and delete fields on Panels Widget Types.'),
+    ),
+  );
+}
+
+/**
+ * Panels Widget Type Loading.
+ *
+ * @param string $type
+ *   The machine readable name of the widget type to load.
+ *
+ * @return PanelsWidgetsTypes[]
+ *   An array of widget types or FALSE if none exist.
+ */
+function panels_widgets_type_load($type) {
+  return panels_widgets_get_types($type);
+}
+
+/**
+ * Get an array of all panels widget types by name.
+ *
+ * @param string $type
+ *   The machine-readable name of the panel widget to load.
+ *
+ * @return PanelsWidgetsType[]
+ *   An array of widget types or a single type.
+ */
+function panels_widgets_get_types($type = NULL) {
+  // Collect the multiple widget type entities by name, checking for
+  // single value if specified.
+  $widget_types = entity_load_multiple_by_name('panels_widgets_type', isset($type) ? array($type) : FALSE);
+  // If $type was requested, ensure single value is returned otherwise return
+  // list of widget types.
+  return isset($type) ? reset($widget_types) : $widget_types;
+}
+
+/**
+ * Fetch a Panels Widget Object.
+ *
+ * @param int $pwid
+ *   Panels Widget ID.
+ * @param bool $reset
+ *   Value to indicate if the internal cache should be reset.
+ *
+ * @return object
+ *   A fully-loaded panels widget type object or FALSE if it cannot be loaded.
+ * @see panels_widgets_load_multiple()
+ */
+function panels_widgets_load($pwid, $reset = FALSE) {
+  // Run through the load process for panels widgets passing the pwid.
+  $panels_widgets = panels_widgets_load_multiple(array($pwid), array(), $reset);
+  // Ensure we only return a single panels widget.
+  return reset($panels_widgets);
+}
+
+/**
+ * Load multiple panels widget types based on conditions.
+ *
+ * @param array $pwids
+ *   Array of panels widget IDs.
+ * @param array $conditions
+ *   An array of conditions to be matched against the panels_widgets table.
+ * @param bool $reset
+ *   A boolean value determining if the internal cache should be reset.
+ *
+ * @return array
+ *   An array of panels widget objects.
+ *
+ * @see entity_load()
+ * @see panels_widgets_load()
+ */
+function panels_widgets_load_multiple($pwids = array(), $conditions = array(), $reset = FALSE) {
+  // Load the panels widget entity.
+  return entity_load('panels_widgets', $pwids, $conditions, $reset);
+}
+
+/**
+ * Implements hook_ctools_plugin_directory().
+ */
+function panels_widgets_ctools_plugin_directory($owner, $plugin_type) {
+  // Register the plugin files for content_types.
+  if ($owner == 'ctools' && $plugin_type == 'content_types') {
+    return 'plugins/' . $plugin_type;
+  }
+}
+
+/**
+ * Attaches the Widget Type forms.
+ */
+function panels_widgets_attach_form(&$form, &$form_state) {
+  // For each widget that has been added attached to the form.
+  foreach ($form_state['widget'] as $type => $widget) {
+    // Define the tree structure for the per widget form elements.
+    $form['widget_' . $widget->type]['#tree'] = TRUE;
+    $form['widget_' . $widget->type]['#parents'] = array('widget_' . $widget->type);
+
+    // Create an instance of the view_mode field if it should be displayed.
+    _panels_widgets_view_modes_field($widget, $form_state['subtype']['optional_view_modes']);
+    // Bind the widget entity fields to the new form structure.
+    field_attach_form('panels_widgets', $widget, $form['widget_' . $widget->type], $form_state);
+  }
+}
+
+/**
+ * Submit handler to extract form values and update panels_widgets entities.
+ *
+ * @param array $form
+ *   The current panels widget form.
+ * @param array $form_state
+ *   The panels widget form state.
+ */
+function panels_widgets_form_submit_handler(&$form, &$form_state) {
+  // Foreach widget entity in the form state.
+  foreach ($form_state['widget'] as $type => $widget) {
+    // Update the entity with the submitted values in the form.
+    field_attach_submit('panels_widgets', $widget, $form['widget_' . $type], $form_state);
+  }
+}
+
+/**
+ * Access callback for the Panels Widgets Type entity API.
+ */
+function panels_widgets_type_access($op, $type = NULL, $account = NULL) {
+  return user_access('administer panels widget types');
+}
+
+/**
+ * Create a new PanelsWidgets Object.
+ */
+function panels_widgets_create_widget(array $values) {
+  return new PanelsWidgets($values);
+}
+
+/**
+ * Saves a new PanelsWidgets Object to the database.
+ */
+function panels_widgets_save_widget(PanelsWidgets $widget) {
+  return $widget->save();
+}
+
+/**
+ * View a PanelsWidgets Object.
+ */
+function panels_widgets_view($widget, $view_mode = 'full', $langcode = NULL, $page = NULL) {
+  return $widget->view($view_mode, $langcode, $page);
+}
+
+/**
+ * Build an options array based on available view modes.
+ *
+ * @return array
+ *   The list of available view modes.
+ */
+function panels_widgets_view_mode_options() {
+  // Get the available view modes.
+  $entity_info = entity_get_info('panels_widgets');
+  // Store the available view modes in an array.
+  $view_modes = array();
+  foreach ($entity_info['view modes'] as $key => $view_mode) {
+    $view_modes[$key] = $view_mode['label'];
+  }
+  return $view_modes;
+}
+
+/**
+ * Build a views mode field for panels.
+ *
+ * @param obj $widget
+ *   The Widgets object.
+ */
+function _panels_widgets_view_modes_field($widget, $display_view_mode) {
+  // Check if we should display the view mode.
+  if ($display_view_mode == TRUE) {
+
+    // Only create a field instance if it doesn't already exist.
+    if (!field_info_instance('panels_widgets', 'field_widgets_view_mode', $widget->type)) {
+      // Build out the instance array.
+      $field = array(
+        'field_name' => 'field_widgets_view_mode',
+        'entity_type' => 'panels_widgets',
+        'bundle' => $widget->type,
+        'label' => t('View Mode'),
+        'description' => t('Select the view mode for this Widget Content.'),
+        'widget' => array(
+          'type' => 'options_select',
+        ),
+      );
+      return field_create_instance($field);
+    }
+  }
+  else {
+    // If an instance of the field is found.
+    if ($instance = field_info_instance('panels_widgets', 'field_widgets_view_mode', $widget->type)) {
+      // Delete the instance but keep the field in place.
+      return field_delete_instance($instance, FALSE);
+    }
+  }
+}
+
+/**
+ * Class Used for Widget Entities.  */
+class PanelsWidgets extends Entity {
+
+  /**
+   * The widget id.
+   *
+   * @var integer
+   */
+  public $pwid;
+
+  /**
+   * The name of the widget type.
+   *
+   * @var string
+   */
+  public $type;
+
+  /**
+   * The widget label.
+   *
+   * @var string
+   */
+  public $label;
+
+  /**
+   * The Unix timestamp when the widget was created.
+   *
+   * @var integer
+   */
+  public $created;
+
+  /**
+   * The Unix timestamp when the widget was last changed.
+   *
+   * @var integer
+   */
+  public $changed;
+
+  /**
+   * Construct the new entity.
+   */
+  public function __construct($values = array()) {
+    // Check for the entity type value and assign it to values.
+    if (isset($values['type']) && is_object($values['type'])) {
+      $values['type'] = $values['type']->type;
+    }
+    // If labels value hasn't been set for existing entity types, assign it.
+    if (!isset($values['label']) && isset($values['type']) && $type = panels_widgets_get_types($values['type'])) {
+      $values['label'] = $type->label;
+    }
+    // Run the Entity class construct with the values and panels_widgets entity.
+    parent::__construct($values, 'panels_widgets');
+  }
+
+  /**
+   * Gets the associated Widget Type object.
+   *
+   * @return PanelsWidgetType
+   *   Loads the Widget Entity Type.
+   */
+  public function type() {
+    return panels_widgets_get_types($this->type);
+  }
+
+  /**
+   * Gets the Widget Type Label.
+   */
+  public function defaultLabel() {
+    return $this->label;
+  }
+
+  /**
+   * Save the Widget Content.
+   */
+  public function save() {
+    // Add a created time if it doesn't exist.
+    if (empty($this->created) && (!empty($this->is_new) || !$this->pid)) {
+      $this->created = REQUEST_TIME;
+    }
+    // Update the changed time.
+    $this->changed = REQUEST_TIME;
+    // Save the Enitty.
+    parent::save();
+  }
+}
+
+/**
+ * Specify a class for Widget Types to set defaults.
+ */
+class PanelsWidgetsType extends Entity {
+  // Define the public variables for the entity types.
+  public $type;
+  public $label;
+  public $weight = 0;
+
+  /**
+   * Run the Entity class to construct with the panels_widgets_type entity.
+   */
+  public function __construct($values = array()) {
+    parent::__construct($values, 'panels_widgets_type');
+  }
+
+  /**
+   * Returns whether the panels widget type is locked.
+   *
+   * Helpful to ensure coded widget types aren't modified.
+   */
+  public function isLocked() {
+    // If the entity status exists and is set to restricted.
+    return isset($this->status) && empty($this->is_new) && (($this->status & ENTITY_IN_CODE) || ($this->status & ENTITY_FIXED));
+  }
+
+  /**
+   * Overrides Entity::save().
+   */
+  public function save() {
+    parent::save();
+    // ToDo: Add cache clearing.
+  }
+}

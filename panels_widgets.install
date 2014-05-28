@@ -1,0 +1,156 @@
+<?php
+/**
+ * @file
+ * Panels Widgets install file.
+ */
+
+/**
+ * Implements hook_schema().
+ *
+ * ToDO: Decide what the best form of indexing will be. Originally planned to
+ * store the panels pane id (pid) but had drawbacks with cloning.
+ */
+function panels_widgets_schema() {
+  $schema = array();
+
+  $schema['panels_widgets'] = array(
+    'description' => 'Stores Widgets',
+    'fields' => array(
+      'pwid' => array(
+        'type' => 'serial',
+        'not null' => TRUE,
+        'description' => 'The primary key identifier for a panels widget.',
+      ),
+      'type' => array(
+        'description' => 'The {panels_widgets_type}.type of widget.',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'pid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => FALSE,
+        'default' => NULL,
+        'description' => "The {panels_pane}.pid of the associated widget type.",
+      ),
+      'label' => array(
+        'description' => 'A human readable label for this widget.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'created' => array(
+        'description' => 'Unix timestamp when the widget was created.',
+        'type' => 'int',
+        'not null' => FALSE,
+      ),
+      'changed' => array(
+        'description' => 'Unix timestamp when the widget was modified.',
+        'type' => 'int',
+        'not null' => FALSE,
+      ),
+    ),
+    'indexes' => array(
+      'pid' => array('pid'),
+    ),
+    'foreign keys' => array(
+      'pid' => array(
+        'table' => 'panels_pane',
+        'columns' => array('pid' => 'pid'),
+      ),
+      'type' => array(
+        'table' => 'panels_widgets_type',
+        'columns' => array('type' => 'type'),
+      ),
+    ),
+    'primary key' => array('pwid'),
+  );
+
+  $schema['panels_widgets_type'] = array(
+    'description' => 'Stores information about created widgets types.',
+    'fields' => array(
+      'id' => array(
+        'type' => 'serial',
+        'not null' => TRUE,
+        'description' => 'Primary key for identifier for widget type.',
+      ),
+      'type' => array(
+        'description' => 'The machine readable name of this widget type.',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+      ),
+      'label' => array(
+        'description' => 'The human readable name of this widget type.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'weight' => array(
+        'description' => 'The weight of this widget type in relation to others.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'size' => 'tiny',
+      ),
+      'data' => array(
+        'type' => 'text',
+        'not null' => FALSE,
+        'size' => 'big',
+        'serialize' => TRUE,
+        'description' => 'A serialized array of additional data related to the widget type.',
+      ),
+      'status' => array(
+        'description' => 'The exportable status of the entity.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => ENTITY_CUSTOM,
+        'size' => 'tiny',
+      ),
+      'module' => array(
+        'description' => 'The name of the providing module if the entity has been defined in code.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => FALSE,
+      ),
+    ),
+    'primary key' => array('id'),
+    'unique keys' => array(
+      'type' => array('type'),
+    ),
+  );
+
+  return $schema;
+}
+
+/**
+ * Implements hook_enable().
+ */
+function panels_widgets_enable() {
+  // Clear the field cache.
+  field_cache_clear();
+  // Register custom fields with the module.
+  field_associate_fields('panels_widgets');
+
+  // Create a field to track view modes. Only if the field
+  // doesn't exist already.
+  if (!field_info_field('field_widgets_view_mode')) {
+    // Build the field values.
+    $field = array(
+      'field_name' => 'field_widgets_view_mode',
+      'type' => 'list_text',
+      'cardinality' => 1,
+      'settings' => array(
+        'allowed_values' => array(
+          'full' => 'Default',
+        ),
+        'allowed_values_function' => 'panels_widgets_view_mode_options',
+      ),
+    );
+    // Create the field.
+    field_create_field($field);
+  }
+}
