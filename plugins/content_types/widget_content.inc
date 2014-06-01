@@ -174,6 +174,5 @@ function panels_widgets_widget_content_content_type_render($subtype, $conf, $pan
 
   // Run the Widget through the Entity->view() method.
   $block->content = panels_widgets_view($widget, $view_mode);
-
   return $block;
 }

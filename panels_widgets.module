@@ -333,6 +333,18 @@ function _panels_widgets_view_modes_field($widget, $display_view_mode) {
 }
 
 /**
+ * Implements hook_theme().
+ */
+function panels_widgets_theme() {
+  return array(
+    'panels_widgets' => array(
+      'render element' => 'elements',
+      'template' => 'panels-widgets',
+    ),
+  );
+}
+
+/**
  * Class Used for Widget Entities.  */
 class PanelsWidgets extends Entity {
 
